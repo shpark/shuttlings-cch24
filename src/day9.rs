@@ -2,42 +2,22 @@ use std::sync::Arc;
 
 use axum::{extract::State, http::{HeaderMap, StatusCode}, response::IntoResponse, Json};
 use leaky_bucket::RateLimiter;
-use tokio::time::Duration;
-
-// use leaky_bucket::RateLimiter;
-// use tokio::time::Duration;
-// 
-// let limiter = RateLimiter::builder()
-//     .initial(10)
-//     .interval(Duration::from_millis(100))
-//     .build();
-// 
-// // This is instantaneous since the rate limiter starts with 10 tokens to
-// // spare.
-// limiter.acquire(10).await;
-// 
-// // This however needs to core switch and wait for a while until the desired
-// // number of tokens is available.
-// limiter.acquire(3).await;
+use tokio::{sync::RwLock, time::Duration};
 
 const MILK_WITHDRAWN: &str = "Milk withdrawn\n";
 
 const NO_MILK_AVAILABLE: &str = "No milk available\n";
 
 #[derive(Clone)]
-pub(super) struct MilkBucket {
-    bucket: Arc<RateLimiter>,
-}
+pub(super) struct MilkBucket(Arc<RwLock<RateLimiter>>);
 
 impl MilkBucket {
     pub(super) fn new() -> MilkBucket {
-        MilkBucket {
-            bucket: Arc::new(RateLimiter::builder()
+        MilkBucket(Arc::new(RwLock::new(RateLimiter::builder()
                 .initial(5)
                 .max(5)
                 .interval(Duration::from_millis(1000))
-                .build()),
-        }
+                .build())))
     }
 }
 
@@ -55,10 +35,10 @@ pub(super) struct MilkUnit {
 
 pub(super) async fn milk(
     headers: HeaderMap,
-    milk_bucket: State<MilkBucket>,
+    State(milk_bucket): State<MilkBucket>,
     milk_unit: Option<Json<MilkUnit>>,
 ) -> impl IntoResponse {
-    if !milk_bucket.0.bucket.try_acquire(1) {
+    if !milk_bucket.0.read().await.try_acquire(1) {
         return (
             StatusCode::TOO_MANY_REQUESTS,
             String::from(NO_MILK_AVAILABLE),
@@ -107,4 +87,21 @@ pub(super) async fn milk(
     } else {
         (StatusCode::BAD_REQUEST, String::new())
     }
+}
+
+pub(super) async fn refill(
+    State(milk_bucket): State<MilkBucket>,
+) -> impl IntoResponse {
+    let mut old_bucket = milk_bucket.0.write().await;
+
+    let _ = std::mem::replace(
+        &mut *old_bucket,
+        RateLimiter::builder()
+            .initial(5)
+            .max(5)
+            .interval(Duration::from_millis(1000))
+            .build()
+    );
+
+    StatusCode::OK
 }
