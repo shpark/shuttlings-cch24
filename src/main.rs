@@ -39,6 +39,7 @@ async fn main() -> shuttle_axum::ShuttleAxum {
         .route("/9/refill", post(day9::refill))
         .route("/12/board", get(day12::board))
         .route("/12/reset", post(day12::reset))
+        .route("/12/place/:team/:column", post(day12::place))
         .route("/", get(day1::hello_world))
         .with_state(AppState::new());
 
