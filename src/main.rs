@@ -14,7 +14,7 @@ mod day12;
 #[derive(Clone)]
 struct AppState {
     milk_bucket: Arc<RwLock<day9::MilkBucket>>,
-    board: Arc<RwLock<day12::Board<4, 4>>>,
+    board: Arc<RwLock<day12::Board<4>>>,
 }
 
 impl AppState {

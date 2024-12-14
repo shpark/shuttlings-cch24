@@ -36,16 +36,15 @@ impl fmt::Display for Tile {
     }
 }
 
-pub(super) struct Board<const ROWS: usize, const COLS: usize> {
+pub(super) struct Board<const N: usize> {
     tiles: Vec<Vec<Tile>>,
 }
 
-impl<const ROWS: usize, const COLS: usize> Board<ROWS, COLS> {
+impl<const N: usize> Board<N> {
     pub(super) fn new() -> Self {
         Board {
             tiles: iter::repeat_n(
-                iter::repeat_n(Tile::default(), COLS).collect::<Vec<_>>(),
-                ROWS
+                iter::repeat_n(Tile::default(), N).collect::<Vec<_>>(), N
             )
             .collect::<Vec<_>>(),
         }
@@ -60,19 +59,19 @@ impl<const ROWS: usize, const COLS: usize> Board<ROWS, COLS> {
     }
 }
 
-impl<const ROWS: usize, const COLS: usize> fmt::Display for Board<ROWS, COLS> {
+impl<const N: usize> fmt::Display for Board<N> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> fmt::Result {
-        for row in 0..ROWS {
+        for row in 0..N {
             write!(f, "{}", WALL)?;
 
-            for col in 0..COLS {
+            for col in 0..N {
                 write!(f, "{}", self.tiles[row][col])?;
             }
 
             writeln!(f, "{}", WALL)?;
         }
 
-        for _ in 0..(COLS + 2) {
+        for _ in 0..(N + 2) {
             write!(f, "{}", WALL)?;
         }
 
@@ -112,7 +111,7 @@ const EMPTY_BOARD: &str = "\
 
     #[test]
     fn test_fmt() {
-        let board: Board<4, 4> = Board::new();
+        let board: Board<4> = Board::new();
 
         assert_eq!(
             format!("{}", board),
