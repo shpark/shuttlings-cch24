@@ -1,8 +1,6 @@
-use std::sync::Arc;
-
 use axum::{extract::State, http::{HeaderMap, StatusCode}, response::IntoResponse, Json};
 use leaky_bucket::RateLimiter;
-use tokio::{sync::RwLock, time::Duration};
+use tokio::time::Duration;
 
 use crate::AppState;
 
