@@ -53,9 +53,10 @@ pub(super) struct Board<const N: usize> {
 impl<const N: usize> Board<N> {
     pub(super) fn new() -> Self {
         Board {
-            tiles: iter::repeat_n(
-                iter::repeat_n(Team::default(), N).collect::<Vec<_>>(), N
+            tiles: iter::repeat(
+                iter::repeat(Team::default()).take(N).collect::<Vec<_>>()
             )
+            .take(N)
             .collect::<Vec<_>>(),
         }
     }
