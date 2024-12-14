@@ -4,20 +4,21 @@ use axum::{extract::State, http::{HeaderMap, StatusCode}, response::IntoResponse
 use leaky_bucket::RateLimiter;
 use tokio::{sync::RwLock, time::Duration};
 
+use crate::AppState;
+
 const MILK_WITHDRAWN: &str = "Milk withdrawn\n";
 
 const NO_MILK_AVAILABLE: &str = "No milk available\n";
 
-#[derive(Clone)]
-pub(super) struct MilkBucket(Arc<RwLock<RateLimiter>>);
+pub(super) struct MilkBucket(RateLimiter);
 
 impl MilkBucket {
     pub(super) fn new() -> MilkBucket {
-        MilkBucket(Arc::new(RwLock::new(RateLimiter::builder()
+        MilkBucket(RateLimiter::builder()
                 .initial(5)
                 .max(5)
                 .interval(Duration::from_millis(1000))
-                .build())))
+                .build())
     }
 }
 
@@ -35,10 +36,10 @@ pub(super) struct MilkUnit {
 
 pub(super) async fn milk(
     headers: HeaderMap,
-    State(milk_bucket): State<MilkBucket>,
+    State(state): State<AppState>,
     milk_unit: Option<Json<MilkUnit>>,
 ) -> impl IntoResponse {
-    if !milk_bucket.0.read().await.try_acquire(1) {
+    if !state.milk_bucket.read().await.0.try_acquire(1) {
         return (
             StatusCode::TOO_MANY_REQUESTS,
             String::from(NO_MILK_AVAILABLE),
@@ -90,12 +91,10 @@ pub(super) async fn milk(
 }
 
 pub(super) async fn refill(
-    State(milk_bucket): State<MilkBucket>,
+    State(state): State<AppState>,
 ) -> impl IntoResponse {
-    let mut old_bucket = milk_bucket.0.write().await;
-
     let _ = std::mem::replace(
-        &mut *old_bucket,
+        &mut state.milk_bucket.write().await.0,
         RateLimiter::builder()
             .initial(5)
             .max(5)
