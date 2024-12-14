@@ -50,6 +50,14 @@ impl<const ROWS: usize, const COLS: usize> Board<ROWS, COLS> {
             .collect::<Vec<_>>(),
         }
     }
+
+    fn reset(&mut self) {
+        for row in 0..self.tiles.len() {
+            for col in 0..self.tiles[0].len() {
+                self.tiles[row][col] = Tile::default();
+            }
+        }
+    }
 }
 
 impl<const ROWS: usize, const COLS: usize> fmt::Display for Board<ROWS, COLS> {
@@ -68,31 +76,39 @@ impl<const ROWS: usize, const COLS: usize> fmt::Display for Board<ROWS, COLS> {
             write!(f, "{}", WALL)?;
         }
 
+        writeln!(f, "")?;
+
         Ok(())
     }
 }
 
 pub(super) async fn board(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
 ) -> impl IntoResponse {
-    StatusCode::OK
+    (StatusCode::OK, state.board.read().await.to_string())
 }
 
 pub(super) async fn reset(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
 ) -> impl IntoResponse {
-    StatusCode::OK
+    state.board.write().await.reset();
+
+    /* Race condition? */
+
+    (StatusCode::OK, state.board.read().await.to_string())
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
 
-const EMPTY_BOARD: &str = r#"⬜⬛⬛⬛⬛⬜
+const EMPTY_BOARD: &str = "\
 ⬜⬛⬛⬛⬛⬜
 ⬜⬛⬛⬛⬛⬜
 ⬜⬛⬛⬛⬛⬜
-⬜⬜⬜⬜⬜⬜"#;
+⬜⬛⬛⬛⬛⬜
+⬜⬜⬜⬜⬜⬜
+";
 
     #[test]
     fn test_fmt() {
