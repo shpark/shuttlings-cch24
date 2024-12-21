@@ -3,6 +3,7 @@ use std::sync::Arc;
 use axum::{routing::{get, post}, Router};
 use day12::Board;
 use day9::MilkBucket;
+use jwt_simple::prelude::HS256Key;
 use tokio::sync::RwLock;
 
 mod day1;
@@ -10,11 +11,13 @@ mod day2;
 mod day5;
 mod day9;
 mod day12;
+mod day16;
 
 #[derive(Clone)]
 struct AppState {
     milk_bucket: Arc<RwLock<day9::MilkBucket>>,
     board: Arc<RwLock<day12::Board<4>>>,
+    jwt_key: HS256Key,
 }
 
 impl AppState {
@@ -22,6 +25,7 @@ impl AppState {
         AppState {
             milk_bucket: Arc::new(RwLock::new(MilkBucket::new())),
             board: Arc::new(RwLock::new(Board::new())),
+            jwt_key: HS256Key::generate(), // ¯\_(ツ)_/¯
         }
     }
 }
@@ -40,6 +44,8 @@ async fn main() -> shuttle_axum::ShuttleAxum {
         .route("/12/board", get(day12::board))
         .route("/12/reset", post(day12::reset))
         .route("/12/place/:team/:column", post(day12::place))
+        .route("/16/wrap", post(day16::wrap))
+        .route("/16/unwrap", get(day16::unwrap))
         .route("/", get(day1::hello_world))
         .with_state(AppState::new());
 
