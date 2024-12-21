@@ -1,5 +1,5 @@
 use axum::{extract::State, http::{self, HeaderMap, HeaderValue, StatusCode}, response::IntoResponse};
-use jwt_simple::{claims::Claims, prelude::{Duration, HS256Key, MACLike}};
+use jwt_simple::{claims::Claims, prelude::{Duration, MACLike}};
 use serde::{Deserialize, Serialize};
 
 use crate::AppState;
@@ -59,25 +59,4 @@ pub(super) async fn unwrap(
     }
 
     (StatusCode::BAD_REQUEST, String::new())
-}
-
-#[cfg(test)]
-mod test {
-    use jwt_simple::{claims::Claims, prelude::{Base64, Duration, HS256Key, MACLike}, reexports::ct_codecs::Encoder};
-
-
-    #[test]
-    fn test_jwt_simple() {
-        let key = HS256Key::generate();
-
-        let base64_encoding = Base64::encode_to_string(key.to_bytes());
-
-        println!("{}", base64_encoding.unwrap());
-
-        let claims = Claims::create(Duration::from_hours(2));
-
-        let jwt = key.authenticate(claims).unwrap();
-
-        println!("{}", jwt);
-    }
 }

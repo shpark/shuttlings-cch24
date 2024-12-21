@@ -1,4 +1,4 @@
-use axum::{http::{HeaderMap, StatusCode}, response::IntoResponse};
+use axum::{http::{self, HeaderMap, StatusCode}, response::IntoResponse};
 use cargo_manifest::{Manifest, MaybeInherited};
 use serde::Deserialize;
 use toml::Value;
@@ -45,7 +45,7 @@ pub(super) async fn manifest(
     headers: HeaderMap,
     body: String,
 ) -> impl IntoResponse {
-    if let Some(content_type) = headers.get("Content-Type") {
+    if let Some(content_type) = headers.get(http::header::CONTENT_TYPE) {
         if content_type.as_ref() != "application/toml".as_bytes() {
             return (StatusCode::BAD_REQUEST, String::new()); // FIXME?
         }

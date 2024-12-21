@@ -1,4 +1,4 @@
-use axum::{extract::State, http::{HeaderMap, StatusCode}, response::IntoResponse, Json};
+use axum::{extract::State, http::{self, HeaderMap, StatusCode}, response::IntoResponse, Json};
 use leaky_bucket::RateLimiter;
 use tokio::time::Duration;
 
@@ -44,7 +44,8 @@ pub(super) async fn milk(
         );
     }
 
-    if !headers.get("Content-Type").is_some_and(|v| v == "application/json") {
+    if !headers.get(http::header::CONTENT_TYPE)
+        .is_some_and(|v| v == "application/json") {
         return (
                 StatusCode::OK,
                 String::from(MILK_WITHDRAWN),
