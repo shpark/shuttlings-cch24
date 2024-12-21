@@ -36,7 +36,9 @@ impl AppState {
 
 #[shuttle_runtime::main]
 async fn main(
-    #[shuttle_shared_db::Postgres] pool: PgPool,
+    #[shuttle_shared_db::Postgres(
+        local_uri = "postgres://postgres:very_secure_password@localhost:5432/postgres"
+    )] pool: PgPool,
 ) -> shuttle_axum::ShuttleAxum {
     // TODO
     sqlx::migrate!()
