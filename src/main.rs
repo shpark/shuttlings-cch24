@@ -3,9 +3,10 @@ use std::sync::Arc;
 use axum::{routing::{delete, get, post, put}, Router};
 use day12::Board;
 use day9::MilkBucket;
-use jwt_simple::prelude::{HS256Key, RSAPublicKey};
+use jwt_simple::prelude::HS256Key;
 use sqlx::PgPool;
 use tokio::sync::RwLock;
+use tower_http::services::ServeDir;
 
 mod day1;
 mod day2;
@@ -14,6 +15,7 @@ mod day9;
 mod day12;
 mod day16;
 mod day19;
+mod day23;
 
 #[derive(Clone)]
 struct AppState {
@@ -69,7 +71,11 @@ async fn main(
         .route("/19/undo/:id", put(day19::undo))
         .route("/19/draft", post(day19::draft))
         .route("/", get(day1::hello_world))
-        .with_state(AppState::with_pool(pool));
+        .route("/23/star", get(day23::star))
+        .route("/23/present/:color", get(day23::present))
+        .route("/23/ornament/:state/:n", get(day23::ornament))
+        .with_state(AppState::with_pool(pool))
+        .nest_service("/assets", ServeDir::new("assets"));
 
     Ok(router.into())
 }
