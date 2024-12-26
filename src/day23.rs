@@ -1,5 +1,8 @@
+use std::io::{Error, ErrorKind};
+
 use askama::Template;
-use axum::{extract::Path, http::StatusCode, response::{Html, IntoResponse}};
+use axum::{extract::{Multipart, Path}, http::StatusCode, response::{Html, IntoResponse}};
+use serde::Deserialize;
 
 enum PresentColor {
     Red,
@@ -130,5 +133,106 @@ pub(super) async fn ornament(
         Ok(Html::from(ornament.render().unwrap()))
     } else {
         Err(StatusCode::IM_A_TEAPOT)
+    }
+}
+
+#[derive(Deserialize, Debug)]
+struct Package {
+    checksum: Option<String>,
+}
+
+#[derive(Deserialize, Debug)]
+struct Lockfile {
+    package: Vec<Package>,
+}
+
+impl TryFrom<String> for ChecksumFragment {
+    type Error = Box<dyn std::error::Error>;
+
+    fn try_from(checksum: String) -> Result<Self, Self::Error> {
+        if checksum.len() < 6 + 2 + 2 {
+            return Err(
+                Box::new(Error::new(ErrorKind::InvalidInput, "ding"))
+            );
+        }
+
+        match u32::from_str_radix(&checksum[0..6], 16) {
+            Ok(_) => {
+                let color = String::from(&checksum[0..6]);
+                let top = u8::from_str_radix(&checksum[6..8], 16)?;
+                let left = u8::from_str_radix(&checksum[8..10], 16)?;
+
+                Ok(ChecksumFragment { color, top, left })
+            },
+            Err(e) => Err(Box::new(e)),
+        }
+    }
+}
+
+#[derive(Template)]
+#[template(path = "../templates/checksum.html")]
+struct ChecksumFragment {
+    color: String,
+    top: u8,
+    left: u8,
+}
+
+pub(super) async fn lockfile(
+    mut multipart: Multipart,
+) -> impl IntoResponse {
+    let mut fragments: Vec<ChecksumFragment> = Vec::new();
+
+    if let Ok(Some(field)) = multipart.next_field().await {
+        let data = field.bytes().await.unwrap();
+
+        let lockfile = toml::from_str::<Lockfile>(
+            std::str::from_utf8(&data).unwrap()
+        );
+
+        if let Ok(lockfile) = lockfile {
+            for package in lockfile.package {
+                match package.checksum {
+                    Some(checksum) => {
+                        match ChecksumFragment::try_from(checksum) {
+                            Ok(fragment) => {
+                                fragments.push(fragment);
+                            },
+                            Err(_) => {
+                                return Err(StatusCode::UNPROCESSABLE_ENTITY);
+                            }
+                        }
+                    },
+                    None => continue,
+                }
+            }
+        } else {
+            return Err(StatusCode::BAD_REQUEST);
+        }
+    } else {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    Ok(Html::from(
+        fragments.into_iter()
+            .map(|fragment| fragment.render().unwrap())
+            .collect::<Vec<_>>()
+            .join("\n")
+    ))
+}
+
+#[cfg(test)]
+mod test {
+    use crate::day23::Lockfile;
+
+    #[test]
+    fn test_deserialize_lockfile() {
+        let lockfile: &str = include_str!("../Cargo.lock");
+
+        let lockfile = lockfile.lines().skip(2).collect::<Vec<_>>().join("\n");
+
+
+        assert!(
+            matches!(toml::from_str::<Lockfile>(lockfile.as_str()), Ok(_))
+        );
     }
 }

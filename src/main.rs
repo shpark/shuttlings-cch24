@@ -51,6 +51,7 @@ async fn main(
         .expect("Failed to run migrations");
 
     let router = Router::new()
+        .route("/", get(day1::hello_world))
         .route("/-1/seek", get(day1::seek))
         .route("/2/dest", get(day2::dest))
         .route("/2/key", get(day2::key))
@@ -70,10 +71,10 @@ async fn main(
         .route("/19/remove/:id", delete(day19::remove))
         .route("/19/undo/:id", put(day19::undo))
         .route("/19/draft", post(day19::draft))
-        .route("/", get(day1::hello_world))
         .route("/23/star", get(day23::star))
         .route("/23/present/:color", get(day23::present))
         .route("/23/ornament/:state/:n", get(day23::ornament))
+        .route("/23/lockfile", post(day23::lockfile))
         .with_state(AppState::with_pool(pool))
         .nest_service("/assets", ServeDir::new("assets"));
 
