@@ -46,7 +46,7 @@ async fn main(
         local_uri = "postgres://postgres:very_secure_password@localhost:5432/postgres"
     )] pool: PgPool,
 ) -> shuttle_axum::ShuttleAxum {
-    // TODO
+
     sqlx::migrate!()
         .run(&pool)
         .await
