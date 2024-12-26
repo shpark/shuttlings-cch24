@@ -1,5 +1,8 @@
-use axum::{extract::{Path, State}, http::StatusCode, response::IntoResponse, Json};
-use serde::{Serialize, Deserialize};
+use std::{fmt, str::FromStr};
+
+use axum::{extract::{Path, Query, State}, http::StatusCode, response::IntoResponse, Json};
+use rand::{distributions::Alphanumeric, Rng};
+use serde::{de, Deserialize, Deserializer, Serialize};
 use sqlx::{prelude::FromRow, query, query_as, types::{chrono::{DateTime, Utc}, Uuid}};
 
 use crate::AppState;
@@ -129,5 +132,94 @@ RETURNING id, author, quote, created_at, version;
             StatusCode::INTERNAL_SERVER_ERROR,
             String::new(),
         )),
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct Params {
+    #[serde(default, deserialize_with="empty_string_as_none")]
+    token: Option<String>,
+}
+
+// See https://github.com/tokio-rs/axum/blob/main/examples/query-params-with-empty-strings/src/main.rs
+//
+// Serde deserialization decorator to map empty Strings to None
+fn empty_string_as_none<'de, D, T>(de: D) -> Result<Option<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: FromStr,
+    T::Err: fmt::Display,
+{
+    let opt = Option::<String>::deserialize(de)?;
+    match opt.as_deref() {
+        None | Some("") => Ok(None),
+        Some(s) => FromStr::from_str(s).map_err(de::Error::custom).map(Some),
+    }
+}
+
+#[derive(Serialize)]
+struct Quotes {
+    quotes: Vec<Quote>,
+    page: i32,
+    next_token: Option<String>,
+}
+
+pub(super) async fn list(
+    State(state): State<AppState>,
+    Query(params): Query<Params>,
+) -> Result<impl IntoResponse, impl IntoResponse> {
+    let page = if let Some(token) = &params.token {
+        if let Some(&offset) = state.token_to_offset.read().await.get(token) {
+            offset
+        } else {
+            // A token was provided, but it is unknown or badly formatted.
+            return Err(StatusCode::BAD_REQUEST);
+        }
+    } else {
+        1
+    };
+
+    let mut token_to_offset = state.token_to_offset.write().await;
+
+    // FIXME(inefficiency): To determine whether we have to issue a token or
+    // not, we fetch up to 4 rows and see if the fourth row is present. If so,
+    // we should issue a new token, otherwise we shouldn't.
+    match query_as::<_, Quote>(r#"
+SELECT * FROM quotes ORDER BY created_at ASC LIMIT 4 OFFSET ($1 - 1) * 3;
+    "#)
+    .bind(page)
+    .fetch_all(&state.pool)
+    .await {
+        Ok(mut quotes) => {
+            let next_token = if quotes.len() < 4 {
+                None
+            } else {
+                let mut rng = rand::thread_rng();
+                let next_token = (0..16)
+                    .map(|_| rng.sample(Alphanumeric) as char)
+                    .collect::<String>();
+
+                token_to_offset.insert(next_token.clone(), page + 1);
+
+                Some(next_token)
+            };
+
+            // We only have to return the first 3 quotes...
+            quotes.pop();
+
+            let quotes = Quotes {
+                quotes,
+                page,
+                next_token,
+            };
+
+            Ok((
+                StatusCode::OK,
+                serde_json::to_string(&quotes).unwrap(),
+            ))
+        },
+
+        // No quotes fetched?
+        Err(_e) => Err(StatusCode::NOT_FOUND),
     }
 }

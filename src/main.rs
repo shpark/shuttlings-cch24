@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use axum::{routing::{delete, get, post, put}, Router};
 use day12::Board;
@@ -24,6 +24,7 @@ struct AppState {
     jwt_key: HS256Key,
     santa_public_pem: &'static str,
     pool: PgPool,
+    token_to_offset: Arc<RwLock<HashMap<String, i32>>>,
 }
 
 impl AppState {
@@ -34,6 +35,7 @@ impl AppState {
             jwt_key: HS256Key::generate(), // ¯\_(ツ)_/¯
             santa_public_pem: include_str!("./day16_santa_public_key.pem"),
             pool,
+            token_to_offset: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 }
@@ -71,6 +73,7 @@ async fn main(
         .route("/19/remove/:id", delete(day19::remove))
         .route("/19/undo/:id", put(day19::undo))
         .route("/19/draft", post(day19::draft))
+        .route("/19/list", get(day19::list))
         .route("/23/star", get(day23::star))
         .route("/23/present/:color", get(day23::present))
         .route("/23/ornament/:state/:n", get(day23::ornament))
